@@ -2,6 +2,7 @@
     "name": "wuxue107/request-proxy",
     "keywords": ["proxy","request proxy","forward","代理","转发"],
     "description": "A simple http request proxy，request forward",
+    "license": "MIT",
     "authors": [
         {
             "name": "nop",
