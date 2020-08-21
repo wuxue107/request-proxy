@@ -11,7 +11,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "wuxue107\\request-proxy\\" : "src/"
+            "wuxue107\\request_proxy\\" : "src/"
         }
     },
     "require": {}
