@@ -1,0 +1,17 @@
+{
+    "name": "wuxue107/request-proxy",
+    "keywords": ["proxy","request proxy","forward","代理","转发"],
+    "description": "A simple http request proxy，request forward",
+    "authors": [
+        {
+            "name": "nop",
+            "email": "575065955@qq.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "wuxue107\\request-proxy\\" : "src/"
+        }
+    },
+    "require": {}
+}
