@@ -29,6 +29,20 @@ class RequestProxy
      */
     public function forward(ServerRequest $request = null)
     {
+
+        $response = $this->send($request);
+        $response->render();
+        return $response;
+    }
+
+    /**
+     * 发送请求
+     *
+     * @param ServerRequest|null $request
+     *
+     * @return ServerResponse
+     */
+    public function send(ServerRequest $request = null){
         if(is_null($request)) {
             $request = ServerRequest::createFromGlobal();
         }
@@ -78,8 +92,6 @@ class RequestProxy
             };
         },$noop);
         $stackRunner($request, $response);
-
-        $response->render();
 
         return $response;
     }
