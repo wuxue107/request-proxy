@@ -42,6 +42,7 @@ class ServerRequest
             $request->method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         }
 
+        $request->url = self::getFullUrl();
         $headers = self::getHeaders();
         unset($headers['Host'], $headers['Connection']);
         $request->headers = $headers;
@@ -66,5 +67,13 @@ class ServerRequest
         }
 
         return $headers;
+    }
+
+    static function getFullUrl(){
+        $sys_protocal = isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == '443' ? 'https://' : 'http://';
+        $php_self = $_SERVER['PHP_SELF'] ? $_SERVER['PHP_SELF'] : $_SERVER['SCRIPT_NAME'];
+        $path_info = isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : '';
+        $relate_url = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : $php_self.(isset($_SERVER['QUERY_STRING']) ? '?'.$_SERVER['QUERY_STRING'] : $path_info);
+        return $sys_protocal.(isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '').$relate_url;
     }
 }
