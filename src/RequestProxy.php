@@ -20,35 +20,27 @@ class RequestProxy
         return $this;
     }
 
-    /**
-     * 转发请求到指定连接
-     *
-     * @param ServerRequest $request
-     *
-     * @return ServerResponse
-     */
-    public function forward(ServerRequest $request = null)
-    {
 
-        $response = $this->send($request);
-        $response->render();
+    private function execute(ServerRequest $request,ServerResponse $response){
+        $stack = $this->stack;
+        @ob_clean();
+
+        $noop = function(){};
+        $stackRunner = array_reduce(array_reverse($stack),function($next,$prev){
+            return function () use ($prev,$next){
+                $args = func_get_args();
+                $args[] = $next;
+                return call_user_func_array($prev,$args);
+            };
+        },$noop);
+        $stackRunner($request, $response);
+
         return $response;
     }
 
-    /**
-     * 发送请求
-     *
-     * @param ServerRequest|null $request
-     *
-     * @return ServerResponse
-     */
-    public function send(ServerRequest $request = null){
-        if(is_null($request)) {
-            $request = ServerRequest::createFromGlobal();
-        }
-        $response = new ServerResponse();
-        unset($http_response_header);
+    private function request(){
         $sendRequest = function(ServerRequest $request, ServerResponse $response) {
+            unset($http_response_header);
             $headerLines = [
                 'Connection: close',
             ];
@@ -79,21 +71,45 @@ class RequestProxy
             }
         };
 
-        $stack = $this->stack;
-        $stack[] = $sendRequest;
-        @ob_clean();
+        $this->stack[] = $sendRequest;
+        return $this;
+    }
 
-        $noop = function(){};
-        $stackRunner = array_reduce(array_reverse($stack),function($next,$prev){
-            return function () use ($prev,$next){
-                $args = func_get_args();
-                $args[] = $next;
-                return call_user_func_array($prev,$args);
-            };
-        },$noop);
-        $stackRunner($request, $response);
+    public function file(){
+        $sendRequest = function(ServerRequest $request, ServerResponse $response){
+            $file = parse_url($request->url,PHP_URL_PATH);
+            $response->fp = @fopen($file, 'r', false);
+            if($response->fp !== false) {
+                $response->outputWay = 'copy';
+                $response->code = 200;
+            }else{
+                $response->code = 404;
+            }
+        };
+        $this->stack[] = $sendRequest;
+        return $this;
+    }
 
-        return $response;
+    /**
+     * 转发请求到指定连接
+     *
+     * @param ServerRequest $request
+     *
+     * @return ServerResponse
+     */
+    public function forward(ServerRequest $request = null)
+    {
+        if(is_null($request)) {
+            $request = ServerRequest::createFromGlobal();
+        }
+        if(preg_match('/^https?:/i',$request->url)){
+            $this->request();
+        }else{
+            $this->file();
+        }
+
+        $response = new ServerResponse();
+        return $this->execute($request,$response);
     }
 
     /**

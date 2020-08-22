@@ -44,7 +44,25 @@ class ServerResponse
     {
         $this->outputWay = 'echo';
         $this->body = $body;
+        foreach($this->headers as $index => $header){
+            if(preg_match('/^Content-Length:/i',$header)){
+                unset($this->headers[$index]);
+            }
+        }
     }
+
+    public function setFileHandle($fp){
+        if($fp){
+            $this->fp = $fp;
+            $this->outputWay = 'copy';
+            foreach($this->headers as $index => $header){
+                if(preg_match('/^Content-Length:/i',$header)){
+                    unset($this->headers[$index]);
+                }
+            }
+        }
+    }
+
 
     public function render()
     {
