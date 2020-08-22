@@ -78,12 +78,17 @@ class RequestProxy
     public function file(){
         $sendRequest = function(ServerRequest $request, ServerResponse $response){
             $file = parse_url($request->url,PHP_URL_PATH);
-            $response->fp = @fopen($file, 'r', false);
-            if($response->fp !== false) {
-                $response->outputWay = 'copy';
-                $response->code = 200;
-            }else{
+            // 务必传绝度路径，容易疏忽造成安全问题
+            if(strpos($file,'..') !== false){
                 $response->code = 404;
+            }else{
+                $response->fp = @fopen($file, 'r', false);
+                if($response->fp !== false) {
+                    $response->outputWay = 'copy';
+                    $response->code = 200;
+                }else{
+                    $response->code = 404;
+                }
             }
         };
         $this->stack[] = $sendRequest;
