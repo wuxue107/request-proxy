@@ -56,7 +56,7 @@ class RequestProxy
                 ],
             ]);
 
-            $response->fp = @fopen($request->url, 'r', false, stream_context_create($request->options));
+            $response->fp = @fopen((string) $request->uri, 'r', false, stream_context_create($request->options));
             if($response->fp !== false) {
                 stream_set_timeout($response->fp, 30);
                 $response->outputWay = 'copy';
@@ -77,7 +77,7 @@ class RequestProxy
 
     public function file(){
         $sendRequest = function(ServerRequest $request, ServerResponse $response){
-            $file = parse_url($request->url,PHP_URL_PATH);
+            $file = $request->uri->getPath();
             // 务必传绝度路径，容易疏忽造成安全问题
             if(strpos($file,'..') !== false){
                 $response->code = 404;
@@ -107,7 +107,8 @@ class RequestProxy
         if(is_null($request)) {
             $request = ServerRequest::createFromGlobal();
         }
-        if(preg_match('/^https?:/i',$request->url)){
+
+        if(in_array($request->uri->getSchema(),['http','https'])){
             $this->request();
         }else{
             $this->file();
@@ -145,17 +146,26 @@ class RequestProxy
         $proxy = new self();
         $proxy->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($pathPrefix, $remoteUrlPrefix) {
             // 示例： http://app.com/manager/user/query?role=admin&age=20#target
-            $urlInfo = parse_url($request->url);
+            $uri = $request->uri;
             // manager
             $pathPrefix = '/' . ltrim($pathPrefix, '/');
-            // user/query
-            $path = ltrim($urlInfo['path'], $pathPrefix);
-            // ?role=admin&age=20
-            $query = (isset($urlInfo['query']) ? ('?' . $urlInfo['query']) : '');
-            //  #target_hash
-            $fragment = (isset($urlInfo['fragment']) ? ('#' . $urlInfo['fragment']) : '');
 
-            $request->url = $remoteUrlPrefix . $path . $query . $fragment;
+            $remoteUri = parse_url($remoteUrlPrefix);
+
+            $uri->setSchema($remoteUri['schema']??'');
+            $uri->setUser($remoteUri['user']??'');
+            $uri->setPass($remoteUri['pass']??'');
+            $uri->setPort($remoteUri['port']??'');
+
+            $path = $remoteUri['path']??'';
+            $pathPrefixLen = strlen($pathPrefix);
+            if(substr($uri->getPath(),0,$pathPrefixLen) !== $pathPrefix){
+                die("proxy miss");
+            }
+
+            $targetPath = $path . substr($uri->getPath(),$pathPrefixLen);
+            $uri->setPath($targetPath);
+
             $next($request, $response);
         });
 
@@ -172,7 +182,7 @@ class RequestProxy
     public function filterSetUrl(string $remoteUrl)
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($remoteUrl) {
-            $request->url = $remoteUrl;
+            $request->uri = $remoteUrl;
             $next($request, $response);
         });
     }
@@ -187,7 +197,7 @@ class RequestProxy
     public function filterSetUserAgent(string $userAgent)
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($userAgent) {
-            $request->headers['User-Agent'] = $userAgent;
+            $request->setHeader('User-Agent',$userAgent);
             $next($request, $response);
         });
     }
@@ -201,6 +211,15 @@ class RequestProxy
     {
         return $this->filterRemoveResponseHeadersUseRegx('/Last-Modified|ETag|Cache-Control|Expires/i')
              ->addFilter(function(ServerRequest $request, ServerResponse $response, $next) {
+                unset($request->headers['If-None-Match'], $request->headers['If-Modified-Since']);
+                $request->headers['Cache-Control'] = 'no-cache';
+                $next($request, $response);
+            });
+    }
+
+    public function filterNoCompress(){
+        return $this->filterRemoveRequestHeader('Accept-Encoding')
+            ->addFilter(function(ServerRequest $request, ServerResponse $response, $next) {
                 unset($request->headers['If-None-Match'], $request->headers['If-Modified-Since']);
                 $request->headers['Cache-Control'] = 'no-cache';
                 $next($request, $response);
@@ -238,9 +257,10 @@ class RequestProxy
             $next($request, $response);
             if($response->code === 200) {
                 if($fileName === '') {
-                    $fileName = basename($request->url);
+                    $fileName = basename($request->uri->getPath());
                 }
-                $fileName = strtr($fileName, [
+
+                $fileName = strtr($fileName?:'download', [
                     "\r" => '',
                     "\n" => '',
                     "<"  => '',
@@ -375,7 +395,7 @@ class RequestProxy
     public function filterRemoveRequestHeader(string $name)
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($name) {
-            unset($request->headers[$name]);
+            $request->removeHeader($name);
             $next($request, $response);
         });
     }
@@ -390,9 +410,8 @@ class RequestProxy
     public function filterRemoveRequestHeaders(array $headerNames)
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($headerNames) {
-            foreach($headerNames as $name) {
-                unset($request->headers[$name]);
-            }
+            $request->removeHeaders($headerNames);
+
             $next($request, $response);
         });
     }
