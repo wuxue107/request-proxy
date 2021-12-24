@@ -2,11 +2,13 @@
 
 namespace wuxue107\request_proxy;
 
+use wuxue107\request_proxy\proxy\RequestURI;
 use wuxue107\request_proxy\proxy\ServerRequest;
 use wuxue107\request_proxy\proxy\ServerResponse;
 
 class RequestProxy
 {
+    private $debug = false;
     private $stack = [];
 
     /**
@@ -30,6 +32,7 @@ class RequestProxy
             return function () use ($prev,$next){
                 $args = func_get_args();
                 $args[] = $next;
+
                 return call_user_func_array($prev,$args);
             };
         },$noop);
@@ -38,62 +41,7 @@ class RequestProxy
         return $response;
     }
 
-    private function request(){
-        $sendRequest = function(ServerRequest $request, ServerResponse $response) {
-            unset($http_response_header);
-            $headerLines = [
-                'Connection: close',
-            ];
-            foreach($request->headers as $name => $value) {
-                $headerLines[] = $name . ': ' . $value;
-            }
 
-            $request->options = array_replace_recursive($request->options ?? [], [
-                'http' => [
-                    'method'  => $request->method,
-                    'header'  => $headerLines,
-                    'content' => $request->body,
-                ],
-            ]);
-
-            $response->fp = @fopen((string) $request->uri, 'r', false, stream_context_create($request->options));
-            if($response->fp !== false) {
-                stream_set_timeout($response->fp, 30);
-                $response->outputWay = 'copy';
-
-                $meta = stream_get_meta_data($response->fp);
-                $headers = $meta['wrapper_data'] ?? [];
-                if(isset($headers[0])) {
-                    $httpCode = explode(' ', $headers[0])[1] ?? '299';
-                    $response->code = (int) $httpCode;
-                }
-                $response->headers = $headers;
-            }
-        };
-
-        $this->stack[] = $sendRequest;
-        return $this;
-    }
-
-    public function file(){
-        $sendRequest = function(ServerRequest $request, ServerResponse $response){
-            $file = $request->uri->getPath();
-            // 务必传绝度路径，容易疏忽造成安全问题
-            if(strpos($file,'..') !== false){
-                $response->code = 404;
-            }else{
-                $response->fp = @fopen($file, 'r', false);
-                if($response->fp !== false) {
-                    $response->outputWay = 'copy';
-                    $response->code = 200;
-                }else{
-                    $response->code = 404;
-                }
-            }
-        };
-        $this->stack[] = $sendRequest;
-        return $this;
-    }
 
     /**
      * 转发请求到指定连接
@@ -108,11 +56,21 @@ class RequestProxy
             $request = ServerRequest::createFromGlobal();
         }
 
-        if(in_array($request->uri->getSchema(),['http','https'])){
-            $this->request();
-        }else{
-            $this->file();
-        }
+        $sendRequest = function(ServerRequest $request, ServerResponse $response) {
+            // 务必传绝度路径，容易疏忽造成安全问题
+            $fullUrl = $request->getUri()->getFullUrl();
+            if(strpos($fullUrl,'..') !== false){
+                $response->setCode(403);
+            }else{
+                $response = $request->send($response);
+            }
+
+            if($this->debug){
+                $response->addHeader('ProxyUrl: ' . $fullUrl);
+            }
+        };
+
+        $this->stack[] = $sendRequest;
 
         $response = new ServerResponse();
         return $this->execute($request,$response);
@@ -138,32 +96,44 @@ class RequestProxy
      *
      * @param $pathPrefix
      * @param $remoteUrlPrefix
-     *
+     * @param $hitHeader
      * @return $this
      */
-    static function toRelativePath(string $pathPrefix, string $remoteUrlPrefix)
+    static function toRelativePath(string $pathPrefix, string $remoteUrlPrefix, $hitHeader = true)
     {
         $proxy = new self();
-        $proxy->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($pathPrefix, $remoteUrlPrefix) {
+        $proxy->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($pathPrefix, $remoteUrlPrefix,$hitHeader) {
             // 示例： http://app.com/manager/user/query?role=admin&age=20#target
-            $uri = $request->uri;
+            $uri = $request->getUri();
             // manager
-            $pathPrefix = '/' . ltrim($pathPrefix, '/');
-
             $remoteUri = parse_url($remoteUrlPrefix);
 
-            $uri->setSchema($remoteUri['schema']??'');
+            $currentPath = $uri->getPath();
+            $uri->setScheme($remoteUri['scheme']??'');
             $uri->setUser($remoteUri['user']??'');
+            $uri->setHost($remoteUri['host']??'');
             $uri->setPass($remoteUri['pass']??'');
             $uri->setPort($remoteUri['port']??'');
 
             $path = $remoteUri['path']??'';
             $pathPrefixLen = strlen($pathPrefix);
-            if(substr($uri->getPath(),0,$pathPrefixLen) !== $pathPrefix){
-                die("proxy miss");
+
+            if(!$hitHeader){
+                $currentPath = strstr($currentPath,$pathPrefix);
             }
 
-            $targetPath = $path . substr($uri->getPath(),$pathPrefixLen);
+            if(substr($currentPath,0,$pathPrefixLen) !== $pathPrefix){
+                if($hitHeader){
+                    $path = rtrim($path,'/') . $currentPath;
+                }else{
+                    header('HTTP/1.1 404 Proxy Missed');
+                    exit();
+                }
+            }
+
+            $appendPath = substr($currentPath,$pathPrefixLen);
+
+            $targetPath = $path . $appendPath;
             $uri->setPath($targetPath);
 
             $next($request, $response);
@@ -182,7 +152,7 @@ class RequestProxy
     public function filterSetUrl(string $remoteUrl)
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($remoteUrl) {
-            $request->uri = $remoteUrl;
+            $request->setUri(RequestURI::fromUri($remoteUrl));
             $next($request, $response);
         });
     }
@@ -211,19 +181,17 @@ class RequestProxy
     {
         return $this->filterRemoveResponseHeadersUseRegx('/Last-Modified|ETag|Cache-Control|Expires/i')
              ->addFilter(function(ServerRequest $request, ServerResponse $response, $next) {
-                unset($request->headers['If-None-Match'], $request->headers['If-Modified-Since']);
-                $request->headers['Cache-Control'] = 'no-cache';
+                 $request->removeHeaders([
+                     'If-None-Match','If-Modified-Since'
+                 ]);
+
+                $request->setHeader('Cache-Control','no-cache');
                 $next($request, $response);
             });
     }
 
     public function filterNoCompress(){
-        return $this->filterRemoveRequestHeader('Accept-Encoding')
-            ->addFilter(function(ServerRequest $request, ServerResponse $response, $next) {
-                unset($request->headers['If-None-Match'], $request->headers['If-Modified-Since']);
-                $request->headers['Cache-Control'] = 'no-cache';
-                $next($request, $response);
-            });
+        return $this->filterRemoveRequestHeader('Accept-Encoding');
     }
 
     /**
@@ -233,11 +201,10 @@ class RequestProxy
      * @return $this
      */
     public function filterSetResponseContentType(string $mimeType){
-        return $this->filterRemoveResponseHeadersUseRegx('/^Content-Type:/i')
-            ->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($mimeType) {
+        return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($mimeType) {
                 $next($request, $response);
-                $response->headers[] = "Content-Type: " . $mimeType;
-            });
+                $response->setHeader('Content-Type',$mimeType);
+        });
     }
 
     /**
@@ -248,49 +215,20 @@ class RequestProxy
      *
      * @return $this
      */
-    public function filterDownload(string $fileName = '', int $timeout = 3600)
+    public function filterDownload(string $fileName = '', int $timeout = 7200)
     {
         return $this->filterNoCache()
-        ->filterSetTimeout($timeout)
         ->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($fileName, $timeout) {
-            set_time_limit(0);
+            set_time_limit($timeout);
+            $request->setTimeout($timeout);
             $next($request, $response);
-            if($response->code === 200) {
+
+            if($response->getCode() === 200) {
                 if($fileName === '') {
-                    $fileName = basename($request->uri->getPath());
+                    $fileName = basename($request->getUri()->getPath());
                 }
 
-                $fileName = strtr($fileName?:'download', [
-                    "\r" => '',
-                    "\n" => '',
-                    "<"  => '',
-                    ">"  => '',
-                    '\\' => '',
-                    '/'  => '',
-                    '|'  => '',
-                    ':'  => '',
-                    '"'  => '',
-                    '*'  => '',
-                    '?'  => '',
-                ]);
-
-                $response->headers[] = "Content-Type: application/octet-stream";
-                $response->headers[] = "Content-Transfer-Encoding: binary";
-                //$response->headers[] = 'Content-Type: application/force-download';
-                //$response->headers[] = 'Content-Type: application/download';
-
-                //处理中文文件名
-                $ua = $_SERVER["HTTP_USER_AGENT"] ?? '';
-                $encodedFileName = str_replace("+", "%20", urlencode($fileName));
-                if(preg_match("/Firefox/i", $ua)) {
-                    $response->headers[] = 'Content-Disposition: attachment; filename*="utf8\'\'' . $fileName . '"';
-                }
-                else if(preg_match("/MSIE|Edge/i", $ua)) {
-                    $response->headers[] = 'Content-Disposition: attachment; filename="' . $encodedFileName . '"';
-                }
-                else {
-                    $response->headers[] = 'Content-Disposition: attachment; filename="' . $fileName . '"';
-                }
+                $response->setDownloadHeader($fileName);
             }
         });
     }
@@ -305,7 +243,7 @@ class RequestProxy
     public function filterSetTimeout(int $timeout)
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($timeout) {
-            $request->options['http']['timeout'] = $timeout;
+            $request->setTimeout($timeout);
             $next($request, $response);
         });
     }
@@ -323,8 +261,7 @@ class RequestProxy
         return $this->filterSetTimeout($timeout)
             ->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($timeout, $fileName) {
                 $next($request, $response);
-
-                $response->headers = [];
+                $response->clearAllHeaders();
                 return $response->saveToFile($fileName);
             });
     }
@@ -342,11 +279,7 @@ class RequestProxy
         $headerNames[] = 'Content-Type';
 
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($headerNames) {
-            foreach(array_keys($request->headers) as $name) {
-                if(!in_array($name, $headerNames)) {
-                    unset($request->headers[$name]);
-                }
-            }
+            $request->removeHeadersWithoutWhileList($headerNames);
 
             $next($request, $response);
         });
@@ -363,7 +296,7 @@ class RequestProxy
     public function filterAddRequestHeader(string $name, string $value)
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($name, $value) {
-            $request->headers[$name] = $value;
+            $request->setHeader($name,$value);
             $next($request, $response);
         });
     }
@@ -378,9 +311,7 @@ class RequestProxy
     public function filterAddRequestHeaders(array $headers)
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($headers) {
-            foreach($headers as $name => $value) {
-                $request->headers[$name] = $value;
-            }
+            $request->setHeaders($headers);
             $next($request, $response);
         });
     }
@@ -437,11 +368,7 @@ class RequestProxy
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($headerRegx) {
             $next($request, $response);
-            foreach($response->headers as $index => $header) {
-                if(preg_match($headerRegx, $header)) {
-                    unset($request->headers[$index]);
-                }
-            }
+            $response->removeResponseHeadersUseRegx($headerRegx);
         });
     }
 
@@ -456,9 +383,7 @@ class RequestProxy
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($headers) {
             $next($request, $response);
-            foreach($headers as $index => $header) {
-                $response->headers[] = $header;
-            }
+            $response->addHeaders($headers);
         });
     }
 
@@ -473,7 +398,7 @@ class RequestProxy
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($header) {
             $next($request, $response);
-            $response->headers[] = $header;
+            $response->addHeader($header);
         });
     }
 }

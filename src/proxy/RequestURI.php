@@ -17,22 +17,43 @@ class RequestURI implements \ArrayAccess
         'fragment' => '',
     ];
 
+    /**
+     * @return array
+     */
+    public function getUriParts(): array
+    {
+        return $this->uriParts;
+    }
+
+    /**
+     * @param array $uriParts
+     */
+    public function setUriParts(array $uriParts): void
+    {
+        $this->uriParts = $uriParts;
+    }
+
     static function fromUri($url)
     {
         $uri = new RequestURI();
         $parts = @parse_url($url)?:[];
         $uri->setParts($parts);
+        return $uri;
     }
 
 
-    public function __toString()
+    public function __toString(){
+        return $this->getFullUrl();
+    }
+
+    public function getFullUrl()
     {
         $uriData = $this->uriParts;
         if($uriData['scheme'] == ""){
             return $uriData['path'];
         }
 
-        $url = $uriData['scheme'];
+        $url = $uriData['scheme'] . '://';
         if (!empty($uriData['user'])) {
             $url .= $uriData['user'] . ($uriData['pass'] ? (':' . $uriData['pass']) : '') . '@';
         }
@@ -73,12 +94,19 @@ class RequestURI implements \ArrayAccess
     static function fromRequest()
     {
         $uri = new RequestURI();
+        $path = null;
+        if(isset($_SERVER['REQUEST_URI'])){
+            $path = strstr($_SERVER['REQUEST_URI'],'?',true);
+        }
+        if(is_null($path)){
+            $path = $_SERVER['PHP_SELF']??$_SERVER['SCRIPT_NAME']??'';
+        }
 
         $uri->setParts([
             'scheme' => isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == '443' ? 'https' : 'http',
-            'path' =>   $_SERVER['REQUEST_URI']??$_SERVER['PHP_SELF'] ?? $_SERVER['SCRIPT_NAME'] ?? null,
-            'query' =>   $_SERVER['QUERY_STRING']??null,
-            'host' => $_SERVER['HTTP_HOST']??null,
+            'path' => $path,
+            'query' =>   $_SERVER['QUERY_STRING']??'',
+            'host' => $_SERVER['HTTP_HOST']??'',
             'port' => $_SERVER['SERVER_PORT']??''
         ]);
 
@@ -108,12 +136,12 @@ class RequestURI implements \ArrayAccess
         return $this;
     }
 
-    public function setSchema($value){
-        return $this->setPart('schema',$value);
+    public function setScheme($value){
+        return $this->setPart('scheme',$value);
     }
 
-    public function getSchema(){
-        return $this->getPart('schema');
+    public function getScheme(){
+        return $this->getPart('scheme');
     }
 
     public function setUser($value){
