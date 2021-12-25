@@ -6,6 +6,20 @@ use wuxue107\request_proxy\proxy\RequestURI;
 use wuxue107\request_proxy\proxy\ServerRequest;
 use wuxue107\request_proxy\proxy\ServerResponse;
 
+
+/**
+ * Class RequestProxy
+ * @package wuxue107\request_proxy
+ *
+ * @method static RequestProxy relativePath($pathPrefix, $remoteUrlPrefix,$hitHeader = true)
+ * @method static RequestProxy setUrl(string $remoteUrl)
+ * @method static RequestProxy setUserAgent(string $userAgent)
+ * @method static RequestProxy noCache()
+ * @method static RequestProxy noCompress($force = false)
+ * @method static RequestProxy addRequestHeaders($headers)
+ * @method static RequestProxy addRequestHeader($headerName,$value)
+ * @method static RequestProxy download($fileName,$timeout = 7200)
+ */
 class RequestProxy
 {
     private $debug = false;
@@ -21,7 +35,6 @@ class RequestProxy
         $this->stack[] = $filter;
         return $this;
     }
-
 
     private function execute(ServerRequest $request,ServerResponse $response){
         $stack = $this->stack;
@@ -77,21 +90,6 @@ class RequestProxy
     }
 
     /**
-     * Http 请求代理转发
-     *
-     * @param string $targetUrl
-     *
-     * @return $this
-     */
-    static function toUrl(string $targetUrl)
-    {
-        $proxy = new self();
-        $proxy->filterSetUrl($targetUrl);
-
-        return $proxy;
-    }
-
-    /**
      * 根据相对路径转发请求
      *
      * @param $pathPrefix
@@ -99,10 +97,8 @@ class RequestProxy
      * @param $hitHeader
      * @return $this
      */
-    static function toRelativePath(string $pathPrefix, string $remoteUrlPrefix, $hitHeader = true)
-    {
-        $proxy = new self();
-        $proxy->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($pathPrefix, $remoteUrlPrefix,$hitHeader) {
+    public function filterRelativePath($pathPrefix, $remoteUrlPrefix,$hitHeader = true){
+        return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($pathPrefix, $remoteUrlPrefix,$hitHeader) {
             // 示例： http://app.com/manager/user/query?role=admin&age=20#target
             $uri = $request->getUri();
             // manager
@@ -138,8 +134,6 @@ class RequestProxy
 
             $next($request, $response);
         });
-
-        return $proxy;
     }
 
     /**
@@ -401,4 +395,25 @@ class RequestProxy
             $response->addHeader($header);
         });
     }
+
+    public static function instance(){
+        return new static();
+    }
+
+    public static function filter($filter){
+        return self::instance()->addFilter($filter);
+    }
+
+    public static function __callStatic($name, $arguments)
+    {
+        $proxy = self::instance();
+
+        $methodFunc = 'filter' . ucfirst($name);
+        if(!method_exists($proxy,$methodFunc)){
+            throw new \ErrorException("call undefined static method" . $methodFunc);
+        }
+
+        return call_user_func_array([$proxy,$methodFunc],$arguments);
+    }
+
 }

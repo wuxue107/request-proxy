@@ -12,7 +12,6 @@ use wuxue107\request_proxy\RequestProxy;
 
 ini_set('display_errors','On');
 error_reporting(E_ALL);
-RequestProxy::toRelativePath('/cgi-bin','https://www.baidu.com')
-    ->addFilter(function(ServerRequest $request,ServerResponse $response, $next){
-        $next($request,$response);
-    })->forward()->render();
+
+
+RequestProxy::relativePath('/cgi-bin','https://www.baidu.com')->forward()->render();
