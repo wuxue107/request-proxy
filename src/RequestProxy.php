@@ -396,6 +396,51 @@ class RequestProxy
         });
     }
 
+    public function filterMatchUrl($urlRegx , callable $filter){
+        return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($urlRegx,$filter) {
+            if(preg_match($urlRegx,$request->getUri()->getFullUrl(),$matches)){
+                $filter($request,$response,$next,$matches);
+            }else{
+                $next($request, $response);
+            }
+        });
+    }
+
+    public function filterMatchPath($pathRegx , callable $filter){
+        return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($pathRegx,$filter) {
+            if(preg_match($pathRegx,$request->getUri()->getPath(),$matches)){
+                $filter($request,$response,$next,$matches);
+            }else{
+                $next($request, $response);
+            }
+        });
+    }
+
+    /**
+     * @param string $type  json | html | javascript | image | css
+     * @param callable $filter
+     * @return $this
+     */
+    public function filterMatchResponseContentType($type , callable $filter ){
+        return $this->filterMatchResponseHeader('#^Content-Type\s*?:.*?'.preg_quote($type).'#',$filter,false);
+    }
+
+    public function filterMatchResponseHeader($responseHeaderRegx , callable $filter , $matchRemove = false){
+        return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($responseHeaderRegx,$filter,$matchRemove) {
+            $next($request, $response);
+            $headers = $response->getHeaders();
+            foreach ($headers as $index => $header){
+                if(preg_match($responseHeaderRegx,$header,$matches)){
+                    if($matchRemove){
+                        $response->removeHeaderByIndex($index);
+                    }
+                    $filter($request, $response,$matches);
+                    break;
+                }
+            }
+        });
+    }
+
     public static function instance(){
         return new static();
     }

@@ -17,6 +17,8 @@ class RequestURI implements \ArrayAccess
         'fragment' => '',
     ];
 
+    private $fullUrl;
+
     /**
      * @return array
      */
@@ -48,31 +50,35 @@ class RequestURI implements \ArrayAccess
 
     public function getFullUrl()
     {
-        $uriData = $this->uriParts;
-        if($uriData['scheme'] == ""){
-            return $uriData['path'];
+        if(is_null($this->fullUrl)){
+            $uriData = $this->uriParts;
+            if($uriData['scheme'] == ""){
+                return $uriData['path'];
+            }
+
+            $url = $uriData['scheme'] . '://';
+            if (!empty($uriData['user'])) {
+                $url .= $uriData['user'] . ($uriData['pass'] ? (':' . $uriData['pass']) : '') . '@';
+            }
+
+            $url .= $uriData['host'];
+
+            if (!empty($uriData['port'])) {
+                $url .= ":" . $uriData['port'];
+            }
+
+            $url .= $uriData['path'];
+
+            if (!empty($uriData['query']))
+                $url .= "?" . $uriData['query'];
+
+            if (!empty($uriData['fragment']))
+                $url .= "#" . $uriData['fragment'];
+
+            $this->fullUrl = $url;
         }
 
-        $url = $uriData['scheme'] . '://';
-        if (!empty($uriData['user'])) {
-            $url .= $uriData['user'] . ($uriData['pass'] ? (':' . $uriData['pass']) : '') . '@';
-        }
-
-        $url .= $uriData['host'];
-
-        if (!empty($uriData['port'])) {
-            $url .= ":" . $uriData['port'];
-        }
-
-        $url .= $uriData['path'];
-
-        if (!empty($uriData['query']))
-            $url .= "?" . $uriData['query'];
-
-        if (!empty($uriData['fragment']))
-            $url .= "#" . $uriData['fragment'];
-
-        return $url;
+        return $this->fullUrl;
     }
 
     static function fromLocalFile($file){
@@ -119,6 +125,7 @@ class RequestURI implements \ArrayAccess
     }
 
     public function setPart($part,$value){
+        $this->fullUrl = null;
         if(isset($this->uriParts[$part])){
             $this->uriParts[$part] = $value??'';
         }
@@ -127,6 +134,7 @@ class RequestURI implements \ArrayAccess
     }
 
     public function setParts($uriParts){
+        $this->fullUrl = null;
         foreach ($uriParts as $part => $value){
             if($value !== null && isset($this->uriParts[$part])){
                 $this->uriParts[$part] = $value;

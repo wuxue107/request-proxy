@@ -14,14 +14,18 @@ class ServerResponse
     /** @var string 相应内容 */
     private $body;
     /** @var resource 请求打开远程URL的文件句柄 */
-    public $fp = false;
+    private $fp = false;
 
-    public $headers = [];
+    private $headers = [];
+
+    public function getHeaders(){
+        return $this->headers;
+    }
 
     public function setResource($fp){
         $this->outputWay = 'copy';
         $this->fp = $fp;
-        $this->removeResponseHeadersUseRegx('/^Content-Length:/i');
+        $this->removeHeadersByRegx('/^Content-Length:/i');
     }
 
     public function addHeader($header){
@@ -34,11 +38,15 @@ class ServerResponse
         }
     }
 
+    public function removeHeaderByIndex($index){
+        unset($this->headers[$index]);
+    }
+
     public function clearAllHeaders(){
         $this->headers = [];
     }
 
-    public function removeResponseHeadersUseRegx(string $headerRegx)
+    public function removeHeadersByRegx(string $headerRegx)
     {
         foreach ($this->headers as $index => $header) {
             if (preg_match($headerRegx, $header)) {
@@ -49,7 +57,7 @@ class ServerResponse
 
     public function setHeader($headerName, $value){
         $headerName = ServerRequest::normalizeHeaderName($headerName);
-        $this->removeResponseHeadersUseRegx('#^'.preg_quote($headerName,'#').':#i');
+        $this->removeHeadersByRegx('#^'.preg_quote($headerName,'#').':#i');
         $this->addHeader("$headerName: $value");
     }
 
