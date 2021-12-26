@@ -52,7 +52,7 @@ class RequestURI implements \ArrayAccess
     {
         if(is_null($this->fullUrl)){
             $uriData = $this->uriParts;
-            if($uriData['scheme'] == ""){
+            if($uriData['scheme'] == "file"){
                 return $uriData['path'];
             }
 
@@ -84,7 +84,7 @@ class RequestURI implements \ArrayAccess
     static function fromLocalFile($file){
         $uri = new RequestURI();
         $uri->setParts([
-            'scheme' => '',
+            'scheme' => 'file',
             'user' => '',
             'pass' => '',
             'host' => '',
@@ -145,6 +145,9 @@ class RequestURI implements \ArrayAccess
     }
 
     public function setScheme($value){
+        if(empty($value)){
+            $value = 'http';
+        }
         return $this->setPart('scheme',$value);
     }
 
