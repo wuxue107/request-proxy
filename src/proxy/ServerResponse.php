@@ -10,7 +10,7 @@ class ServerResponse
     /** @var int 请求响应 HTTP CODE */
     private $code = 0;
     /** @var string 如果请求结果没有读取或设置过，直接通过fpassthru函数拷贝到输出 */
-    public $outputWay = 'echo';
+    private $outputWay = 'echo';
     /** @var string 相应内容 */
     private $body;
     /** @var resource 请求打开远程URL的文件句柄 */
@@ -63,7 +63,11 @@ class ServerResponse
 
     public function setHeaders($headers){
         foreach ($headers as $headerName => $value){
-            $this->setHeader($headerName,$value);
+            if(is_int($headerName)){
+                $this->addHeader($value);
+            }else{
+                $this->setHeader($headerName,$value);
+            }
         }
     }
 
