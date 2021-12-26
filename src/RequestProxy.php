@@ -362,7 +362,7 @@ class RequestProxy
     {
         return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($headerRegx) {
             $next($request, $response);
-            $response->removeResponseHeadersUseRegx($headerRegx);
+            $response->removeHeadersByRegx($headerRegx);
         });
     }
 
