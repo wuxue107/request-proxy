@@ -396,19 +396,31 @@ class RequestProxy
         });
     }
 
+    public function filterMatchHost($regx , callable $filter){
+        return $this->filterMatchUri($regx,$filter,'host');
+    }
+
+    public function filterMatchPort($regx , callable $filter){
+        return $this->filterMatchUri($regx,$filter,'port');
+    }
+
     public function filterMatchUrl($urlRegx , callable $filter){
-        return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($urlRegx,$filter) {
-            if(preg_match($urlRegx,$request->getUri()->getFullUrl(),$matches)){
-                $filter($request,$response,$next,$matches);
-            }else{
-                $next($request, $response);
-            }
-        });
+        return $this->filterMatchUri($urlRegx,$filter,null);
     }
 
     public function filterMatchPath($pathRegx , callable $filter){
-        return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($pathRegx,$filter) {
-            if(preg_match($pathRegx,$request->getUri()->getPath(),$matches)){
+        return $this->filterMatchUri($pathRegx,$filter,'path');
+    }
+
+    public function filterMatchUri($pathRegx , callable $filter ,$part = null){
+        return $this->addFilter(function(ServerRequest $request, ServerResponse $response, $next) use ($pathRegx,$filter,$part) {
+            if(is_null($part)){
+                $partValue = $request->getUri()->getFullUrl();
+            }else{
+                $partValue = $request->getUri()->getPart($part)?:'';
+            }
+
+            if(preg_match($pathRegx,$partValue,$matches)){
                 $filter($request,$response,$next,$matches);
             }else{
                 $next($request, $response);
