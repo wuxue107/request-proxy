@@ -8,6 +8,8 @@ class ServerRequest
     private $uri;
     private $method;
     private $headers = [];
+
+    /** @var RequestBody */
     private $body;
     private $options;
 
@@ -171,6 +173,10 @@ class ServerRequest
         $this->headers[self::normalizeHeaderName($name)] = $value;
     }
 
+    public function getHeader($name){
+        return $this->headers[self::normalizeHeaderName($name)]??null;
+    }
+
     static function createFromGlobal()
     {
         $request = new ServerRequest();
@@ -194,13 +200,15 @@ class ServerRequest
         $request->headers = $headers;
 
         if ($request->method == 'POST') {
-            $request->body = file_get_contents('php://input');
+            $request->body = RequestBody::createFromGlobal();
         } else {
             $request->body = null;
         }
 
         return $request;
     }
+
+
 
     static function normalizeHeaderName($name)
     {

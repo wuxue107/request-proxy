@@ -155,6 +155,7 @@ class ServerResponse
             @header($header, true);
         }
 
+        //user_error(var_export($this->headers,true));
         if($this->outputWay === 'copy') {
             @fpassthru($this->fp);
         }
