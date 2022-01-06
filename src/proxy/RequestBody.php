@@ -183,7 +183,7 @@ class RequestBody
 
         $contentType = $this->request->getHeader('Content-Type');
         if(strpos($contentType,'json')){
-            $this->content = json_encode($contentType,JSON_FORCE_OBJECT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $this->content = json_encode($this->data,JSON_FORCE_OBJECT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }else if(strpos($contentType,'multipart/form-data') != false){
             $this->content = $this->getMultipartFormContent();
         }else if(strpos($contentType,'form') != false){
