@@ -10,6 +10,7 @@ require __DIR__ . '/src/RequestProxy.php';
 require __DIR__ . '/src/proxy/ServerRequest.php';
 require __DIR__ . '/src/proxy/ServerResponse.php';
 require __DIR__ . '/src/proxy/RequestURI.php';
+require __DIR__ . '/src/proxy/RequestBody.php';
 
 //$item = [
 //        "name" => [

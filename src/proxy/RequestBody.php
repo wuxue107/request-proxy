@@ -23,7 +23,7 @@ class RequestBody
         $body->request = $request;
 
         $contentType = $request->getHeader('Content-Type');
-        if(strpos('form') != false){
+        if(strpos($contentType,'form') != false){
             $body->data = $_POST;
             if(preg_match('#boundary=(.*)#',$contentType,$matches)){
                 $body->files = self::initFiles();

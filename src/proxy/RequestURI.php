@@ -157,7 +157,7 @@ class RequestURI implements \ArrayAccess
     }
 
 
-    protected function getPart($part){
+    public function getPart($part){
         return $this->uriParts[$part]??null;
     }
 
