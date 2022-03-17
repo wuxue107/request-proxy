@@ -200,7 +200,7 @@ class ServerRequest
         $request->headers = $headers;
 
         if ($request->method == 'POST') {
-            $request->body = RequestBody::createFromGlobal();
+            $request->body = RequestBody::createFromServerRequest($request);
         } else {
             $request->body = null;
         }

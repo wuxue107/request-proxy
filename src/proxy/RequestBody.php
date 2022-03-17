@@ -14,7 +14,7 @@ class RequestBody
 
     private ServerRequest $request;
 
-    public function createFromServerRequest(ServerRequest $request){
+    public static function createFromServerRequest(ServerRequest $request){
         if($request->getMethod() != 'POST'){
             return null;
         }
@@ -24,14 +24,14 @@ class RequestBody
 
         $contentType = $request->getHeader('Content-Type');
         if(strpos('form') != false){
-            $this->data = $_POST;
+            $body->data = $_POST;
             if(preg_match('#boundary=(.*)#',$contentType,$matches)){
-                $this->files = self::initFiles();
+                $body->files = self::initFiles();
             }
         }else{
-            $this->content = file_get_contents('php://input');
+            $body->content = file_get_contents('php://input');
             if(strpos('json') != false){
-                $this->data = @json_decode($this->content,true);
+                $body->data = @json_decode($body->content,true);
             }
         }
 
