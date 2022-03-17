@@ -82,8 +82,9 @@ class RequestBody
 
     public function getMultipartFormContent(){
         $boundary = '--' . md5(uniqid());
+
+        $this->request->setHeader('Content-type',"multipart/form-data, boundary={$boundary}");
         $items = [];
-        $items[] = "Content-type: multipart/form-data, boundary={$boundary}\r\n";
         self::processMultipartFormPost($this->data,$boundary,'',$items);
         self::processMultipartFormFile($this->files,$boundary,$items);
         $items[] = "\r\n--{$boundary}--";
@@ -170,8 +171,8 @@ class RequestBody
             $tmpName = $file['tmp_name'];
             $items[] = "\r\n--$boundary";
             $items[] = "\r\nContent-Disposition: form-data;name=\"{$inputName}\"; filename=\"$fileName\"";
-            $items[] = "\r\nContent-Type: " . $type . "\r\n\r\n";
-            $items[] = file_get_contents($tmpName);
+            $items[] = "\r\nContent-Type: " . ($type?:"application/octet-stream") . "\r\n\r\n";
+            $items[] = $tmpName?file_get_contents($tmpName):"";
         }
     }
 
@@ -182,11 +183,11 @@ class RequestBody
         }
 
         $contentType = $this->request->getHeader('Content-Type');
-        if(strpos($contentType,'json')){
-            $this->content = json_encode($this->data,JSON_FORCE_OBJECT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        }else if(strpos($contentType,'multipart/form-data') != false){
+        if(strpos($contentType,'multipart/form-data') !== false){
             $this->content = $this->getMultipartFormContent();
-        }else if(strpos($contentType,'form') != false){
+        }else if(strpos($contentType,'json') !== false){
+            $this->content = json_encode($this->data,JSON_FORCE_OBJECT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }else if(strpos($contentType,'form') !== false){
             $this->content = $this->getNormalFormContent();
         }else{
             $this->content = strval($this->data);

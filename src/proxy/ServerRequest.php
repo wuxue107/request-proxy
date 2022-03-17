@@ -45,6 +45,18 @@ class ServerRequest
         $this->method = strtoupper($method);
     }
 
+    public function isMethod($method){
+        return $this->method = strtoupper($method);
+    }
+
+    public function isPost(){
+        return $this->isMethod('POST');
+    }
+
+    public function isGet(){
+        return $this->isMethod('GET');
+    }
+
     /**
      * @return mixed
      */
@@ -226,6 +238,13 @@ class ServerRequest
             $headerLines = [
                 'Connection: close',
             ];
+
+            $body = '';
+            if($this->isPost() || $this->isMethod('PUT')){
+                $body = (string) $this->getBody();
+                $this->setHeader('Content-Length',strlen($body));
+            }
+
             foreach($this->headers as $name => $value) {
                 $headerLines[] = $name . ': ' . $value;
             }
@@ -234,7 +253,7 @@ class ServerRequest
                 'http' => [
                     'method'  => $this->getMethod(),
                     'header'  => $headerLines,
-                    'content' => $this->getBody(),
+                    'content' => $body,
                 ],
             ]));
 
