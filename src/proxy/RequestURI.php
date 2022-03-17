@@ -17,7 +17,43 @@ class RequestURI implements \ArrayAccess
         'fragment' => '',
     ];
 
+    private $queryParams = [];
+
     private $fullUrl;
+
+    public function getQueryParams(): array{
+        return $this->queryParams;
+    }
+
+    public function getQueryParam($name){
+        return $this->queryParams[$name]??null;
+    }
+
+    public function setQueryParams(array $params){
+        $this->queryParams = $params;
+        $this->setPart('query',http_build_query($params));
+
+        return $this;
+    }
+
+
+    public function addQueryParams(array $params){
+        $params = $this->getQueryParams();
+        foreach ($params as $key => $val)
+            $params[$key] = $val;
+
+        $this->setQueryParams($params);
+        return $this;
+    }
+
+    public function addQueryParam($name,$val){
+        $this->addQueryParams([$name => $val]);
+        return $this;
+    }
+
+    public function removeQueryParam($name){
+        return $this->addQueryParam($name,null);
+    }
 
     /**
      * @return array
@@ -111,20 +147,21 @@ class RequestURI implements \ArrayAccess
         $uri->setParts([
             'scheme' => isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == '443' ? 'https' : 'http',
             'path' => $path,
-            'query' =>   $_SERVER['QUERY_STRING']??'',
             'host' => $_SERVER['HTTP_HOST']??'',
             'port' => $_SERVER['SERVER_PORT']??''
         ]);
+
+        $uri->setQuery($_SERVER['QUERY_STRING']??'');
 
         return $uri;
     }
 
 
-    public function getPart($part){
+    protected function getPart($part){
         return $this->uriParts[$part]??null;
     }
 
-    public function setPart($part,$value){
+    protected function setPart($part,$value){
         $this->fullUrl = null;
         if(isset($this->uriParts[$part])){
             $this->uriParts[$part] = $value??'';
@@ -200,6 +237,8 @@ class RequestURI implements \ArrayAccess
 
 
     public function setQuery($value){
+        @parse_str((string) $value,$params);
+        $this->queryParams = $params?:[];
         return $this->setPart('query',$value);
     }
 
