@@ -17,12 +17,12 @@
 ```php
     use wuxue107\request_proxy\RequestProxy;
     
-    RequestProxy::toUrl('https://www.baidu.com/img/PCtm_d9c8750bed0b3c7d089fa7d55720d6cf.png')->forward();
+    RequestProxy::setUrl('https://www.baidu.com/img/PCtm_d9c8750bed0b3c7d089fa7d55720d6cf.png')->forward()->render();
 ```
 ## forwards a picture 代理下载一张图片
 ```php
     use wuxue107\request_proxy\RequestProxy;
-    RequestProxy::toUrl('https://www.baidu.com/img/PCtm_d9c8750bed0b3c7d089fa7d55720d6cf.png')->filterDownload()->forward();
+    RequestProxy::toUrl('https://www.baidu.com/img/PCtm_d9c8750bed0b3c7d089fa7d55720d6cf.png')->filterDownload()->forward()->render();
 ```
 
 ##  Proxy the third-party API and automatically handle the access token 代理第三方API并处理ACCESS_TOKEN 相对路径的转发请求，
@@ -54,7 +54,7 @@ RequestProxy::toRelativePath('/cgi-bin','https://qyapi.weixin.qq.com/cgi-bin')
         
         // After send request run
         // 请求之后执行
-    })->forward();
+    })->forward()->render();
 ```
 
 ## All filter inner method  所有的内置过滤函数
