@@ -9,7 +9,11 @@
 - Relative path forwarding request
 - 相对路径转发请求
 
+# Install 
 
+```bash
+composer install wuxue107/request-proxy
+```
 
 # Quick Usage 
 
