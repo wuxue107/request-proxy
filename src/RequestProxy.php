@@ -13,12 +13,6 @@ use wuxue107\request_proxy\proxy\ServerResponse;
  *
  * @method static RequestProxy relativePath($pathPrefix, $remoteUrlPrefix,$hitHeader = true)
  * @method static RequestProxy setUrl(string $remoteUrl)
- * @method static RequestProxy setUserAgent(string $userAgent)
- * @method static RequestProxy noCache()
- * @method static RequestProxy noCompress($force = false)
- * @method static RequestProxy addRequestHeaders($headers)
- * @method static RequestProxy addRequestHeader($headerName,$value)
- * @method static RequestProxy download($fileName,$timeout = 7200)
  */
 class RequestProxy
 {
