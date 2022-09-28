@@ -8,8 +8,7 @@
 - 可以通过RequestProxy提供的filter方法，进行请求和响应的过滤处理，可以添加自定义处理方法
 - Relative path forwarding request
 - 相对路径转发请求
-- Not supported at this time $_FILE forwarding
-- 目前不支持$_FILE转发
+
 
 
 # Quick Usage 
